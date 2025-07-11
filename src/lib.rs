@@ -45,9 +45,29 @@ impl CompactSize {
         }
 
         match bytes[0] {
-            0xFD => { if bytes.len() < 3 { return Err(BitcoinError::InsufficientBytes); } let value = u16::from_le_bytes([bytes[1], bytes[2]]); Ok((CompactSize::new(value as u64), 3)) }
-            0xFE => { if bytes.len() < 5 { return Err(BitcoinError::InsufficientBytes); } let value = u32::from_le_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]); Ok((CompactSize::new(value as u64), 5)) }
-            0xFF => { if bytes.len() < 9 { return Err(BitcoinError::InsufficientBytes); } let value = u64::from_le_bytes([ bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8], ]); Ok((CompactSize::new(value), 9)) }
+            0xFD => {
+                if bytes.len() < 3 {
+                    return Err(BitcoinError::InsufficientBytes);
+                }
+                let value = u16::from_le_bytes([bytes[1], bytes[2]]);
+                Ok((CompactSize::new(value as u64), 3))
+            }
+            0xFE => {
+                if bytes.len() < 5 {
+                    return Err(BitcoinError::InsufficientBytes);
+                }
+                let value = u32::from_le_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]);
+                Ok((CompactSize::new(value as u64), 5))
+            }
+            0xFF => {
+                if bytes.len() < 9 {
+                    return Err(BitcoinError::InsufficientBytes);
+                }
+                let value = u64::from_le_bytes([
+                    bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8],
+                ]);
+                Ok((CompactSize::new(value), 9))
+            }
             x => Ok((CompactSize::new(x as u64), 1)),
         }
     }
@@ -56,13 +76,19 @@ impl CompactSize {
 pub struct Txid(pub [u8; 32]);
 
 impl Serialize for Txid {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
         serializer.serialize_str(&hex::encode(self.0))
     }
 }
 
 impl<'de> Deserialize<'de> for Txid {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
         let s = String::deserialize(deserializer)?;
         hex::decode(s)
             .map_err(serde::de::Error::custom)
@@ -87,7 +113,10 @@ pub struct OutPoint {
 
 impl OutPoint {
     pub fn new(txid: [u8; 32], vout: u32) -> Self {
-        OutPoint { txid: Txid(txid), vout }
+        OutPoint {
+            txid: Txid(txid),
+            vout,
+        }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -134,7 +163,9 @@ impl Script {
 }
 impl Deref for Script {
     type Target = Vec<u8>;
-    fn deref(&self) -> &Self::Target { &self.bytes }
+    fn deref(&self) -> &Self::Target {
+        &self.bytes
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -173,7 +204,10 @@ impl TransactionInput {
             bytes[outpoint_bytes + script_bytes + 2],
             bytes[outpoint_bytes + script_bytes + 3],
         ]);
-        Ok((Self::new(previous_output, script_sig, sequence), outpoint_bytes + script_bytes + 4))
+        Ok((
+            Self::new(previous_output, script_sig, sequence),
+            outpoint_bytes + script_bytes + 4,
+        ))
     }
 }
 
@@ -222,22 +256,39 @@ impl BitcoinTransaction {
         if bytes.len() < offset + 4 {
             return Err(BitcoinError::InsufficientBytes);
         }
-        let lock_time = u32::from_le_bytes([bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]]);
-        Ok((BitcoinTransaction::new(version, inputs, lock_time), offset + 4))
+        let lock_time = u32::from_le_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+        ]);
+        Ok((
+            BitcoinTransaction::new(version, inputs, lock_time),
+            offset + 4,
+        ))
     }
 }
 
 impl fmt::Display for BitcoinTransaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Bitcoin Transaction:\n")?;
-        write!(f, "  Version: {}\n", self.version )?;
-        write!(f, "  Inputs:\n" )?;
+        write!(f, "  Version: {}\n", self.version)?;
+        write!(f, "  Inputs:\n")?;
         for (i, input) in self.inputs.iter().enumerate() {
-            write!(f, "    Input {}:\n", i + 1 )?;
-            write!(f, "      Previous Output Vout: {}\n", input.previous_output.vout)?;
-            write!(f, "      ScriptSig: length={}, bytes={}\n", input.script_sig.len(), hex::encode(&*input.script_sig) )?;
-            write!(f, "      Sequence: {}\n", input.sequence )?;
+            write!(f, "    Input {}:\n", i + 1)?;
+            write!(
+                f,
+                "      Previous Output Vout: {}\n",
+                input.previous_output.vout
+            )?;
+            write!(
+                f,
+                "      ScriptSig: length={}, bytes={}\n",
+                input.script_sig.len(),
+                hex::encode(&*input.script_sig)
+            )?;
+            write!(f, "      Sequence: {}\n", input.sequence)?;
         }
-        write!(f, "  Lock Time: {}\n", self.lock_time )
+        write!(f, "  Lock Time: {}\n", self.lock_time)
     }
 }
